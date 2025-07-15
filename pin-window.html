@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Copilot Usage</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 320px;
+        height: 140px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: #ffffff;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: #f6f8fa;
+        border-bottom: 1px solid #e1e4e8;
+        font-size: 12px;
+        font-weight: 600;
+        color: #24292f;
+      }
+
+      .title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .live-dot {
+        width: 6px;
+        height: 6px;
+        background: #22c55e;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .controls {
+        display: flex;
+        gap: 4px;
+      }
+
+      button {
+        width: 24px;
+        height: 24px;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        transition: background-color 0.15s ease;
+      }
+
+      button:hover {
+        background: #e1e4e8;
+      }
+
+      .close-btn:hover {
+        background: #ff4757;
+        color: white;
+      }
+
+      .content {
+        padding: 16px 12px 12px;
+      }
+
+      .usage-text {
+        font-size: 20px;
+        font-weight: 700;
+        color: #24292f;
+        margin-bottom: 8px;
+      }
+
+      .progress-container {
+        width: 100%;
+        height: 8px;
+        background: #e1e4e8;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 8px;
+      }
+
+      .progress-bar {
+        height: 100%;
+        background: #22c55e;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+        width: 0%;
+      }
+
+      .status {
+        font-size: 11px;
+        color: #656d76;
+        text-align: center;
+      }
+
+      .connecting {
+        color: #fb8500;
+      }
+
+      .error {
+        color: #d73a49;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="title">
+        <div class="live-dot"></div>
+        <span>Copilot Usage</span>
+      </div>
+      <div class="controls">
+        <button id="refreshBtn" title="Refresh">🔄</button>
+        <button id="closeBtn" class="close-btn" title="Close">✕</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="usage-text" id="usageText">--.--%</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="status connecting" id="status">Connecting...</div>
+    </div>
+
+    <script src="pin-window.js"></script>
+  </body>
+</html>

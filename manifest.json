@@ -3,10 +3,17 @@
   "name": "GitHub Copilot Premium Pin",
   "description": "Pin and move GitHub Copilot usage bar to always stay visible.",
   "version": "1.0",
-  "permissions": ["scripting", "activeTab"],
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "storage",
+    "notifications",
+    "system.display",
+    "tabs"
+  ],
   "host_permissions": ["https://github.com/*"],
   "action": {
-    "default_title": "Copilot Premium Pin"
+    "default_title": "Pin Copilot Usage Widget"
   },
   "background": {
     "service_worker": "background.js"
