@@ -5,16 +5,31 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("Copilot Premium Pin Extension Installed");
 });
 
-// ฟังก์ชันเพื่อทำให้ window อยู่บนสุด (best effort)
+// ฟังก์ชันเพื่อทำให้ window อยู่บนสุด (aggressive mode)
 async function keepWindowOnTop() {
   if (pinnedWindow) {
     try {
       // ดึงข้อมูล window ปัจจุบัน
       const window = await chrome.windows.get(pinnedWindow.id);
 
-      // ถ้า window ยังเปิดอยู่ ให้ focus มันอีกครั้ง
-      if (window && !window.focused) {
-        await chrome.windows.update(pinnedWindow.id, { focused: true });
+      // ให้ focus และ bring to front อย่างต่อเนื่อง
+      if (window) {
+        await chrome.windows.update(pinnedWindow.id, {
+          focused: true,
+          drawAttention: true,
+          state: "normal",
+        });
+
+        // Force bring to front อีกครั้ง
+        setTimeout(async () => {
+          try {
+            await chrome.windows.update(pinnedWindow.id, { focused: true });
+          } catch (e) {
+            /* ignore */
+          }
+        }, 100);
+
+        console.log("🔝 Forced window to stay on top");
       }
     } catch (error) {
       // Window ถูกปิดแล้ว ให้หยุด interval
@@ -101,17 +116,18 @@ async function createPinnedWindow() {
     pinnedWindow = await chrome.windows.create({
       url: "pin-window.html",
       type: "popup",
-      width: 320,
-      height: 140,
-      left: screenWidth - 340,
+      width: 200, // ลดจาก 280 เป็น 200 (เล็กมาก)
+      height: 80, // ลดจาก 120 เป็น 80 (เล็กมาก)
+      left: screenWidth - 220, // ปรับตำแหน่งตามขนาดใหม่
       top: 20,
       focused: true,
+      // ลบ alwaysOnTop: true ออก (ไม่ support ใน Chrome extension API)
     });
 
     console.log("Pin window created:", pinnedWindow.id);
 
-    // เริ่ม interval เพื่อทำให้ window อยู่บนสุด
-    keepOnTopInterval = setInterval(keepWindowOnTop, 3000); // ทุก 3 วินาที
+    // เริ่ม interval เพื่อทำให้ window อยู่บนสุด (ทุก 800ms - aggressive)
+    keepOnTopInterval = setInterval(keepWindowOnTop, 800);
   } catch (error) {
     console.error("Error creating pin window:", error);
 
@@ -120,17 +136,18 @@ async function createPinnedWindow() {
       pinnedWindow = await chrome.windows.create({
         url: "pin-window.html",
         type: "popup",
-        width: 320,
-        height: 140,
+        width: 200, // ลดขนาดเริ่มต้น (เล็กมาก)
+        height: 80, // ลดขนาดเริ่มต้น (เล็กมาก)
         left: 800, // ค่าเริ่มต้น
         top: 20,
         focused: true,
+        // ลบ alwaysOnTop: true ออก (ไม่ support ใน Chrome extension API)
       });
 
       console.log("Pin window created with default position:", pinnedWindow.id);
 
-      // เริ่ม interval เพื่อทำให้ window อยู่บนสุด
-      keepOnTopInterval = setInterval(keepWindowOnTop, 3000); // ทุก 3 วินาที
+      // เริ่ม interval เพื่อทำให้ window อยู่บนสุด (ทุก 800ms - aggressive)
+      keepOnTopInterval = setInterval(keepWindowOnTop, 800);
     } catch (fallbackError) {
       console.error("Failed to create pin window:", fallbackError);
     }
@@ -148,5 +165,37 @@ chrome.windows.onRemoved.addListener((windowId) => {
       clearInterval(keepOnTopInterval);
       keepOnTopInterval = null;
     }
+  }
+});
+
+// ฟังเมื่อมีการเปลี่ยน focus ของ window (aggressive refocus)
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (
+    pinnedWindow &&
+    windowId !== pinnedWindow.id &&
+    windowId !== chrome.windows.WINDOW_ID_NONE
+  ) {
+    // ทันทีที่มี window อื่นได้ focus ให้ bring pin window กลับมาทันที
+    setTimeout(async () => {
+      try {
+        await chrome.windows.update(pinnedWindow.id, {
+          focused: true,
+          drawAttention: true,
+        });
+
+        // Force อีกครั้งหลัง 100ms
+        setTimeout(async () => {
+          try {
+            await chrome.windows.update(pinnedWindow.id, { focused: true });
+          } catch (e) {
+            /* ignore */
+          }
+        }, 100);
+
+        console.log("🔄 Aggressively refocused pin window");
+      } catch (error) {
+        console.log("Pin window might be closed");
+      }
+    }, 100); // ลด delay ลงเป็น 100ms เพื่อ response เร็วขึ้น
   }
 });

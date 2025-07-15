@@ -67,11 +67,26 @@ console.log("🚀 Copilot Pin Extension Starting...");
     };
 
     try {
-      await chrome.storage.local.set({ copilotData: data });
-      console.log("💾 Data saved to storage:", data);
+      // ตรวจสอบว่า chrome API ยังใช้ได้หรือไม่
+      if (chrome && chrome.storage && chrome.storage.local) {
+        await chrome.storage.local.set({ copilotData: data });
+        console.log("💾 Data saved to storage:", data);
+      } else {
+        console.warn(
+          "⚠️ Chrome extension context invalidated, cannot save data"
+        );
+      }
     } catch (error) {
       console.error("❌ Error saving data:", error);
+      // ถ้า extension context invalidated ให้หยุดการทำงาน
+      if (error.message.includes("Extension context invalidated")) {
+        console.log(
+          "🔄 Extension context invalidated, stopping content script"
+        );
+        return false;
+      }
     }
+    return true;
   }
 
   // ฟังก์ชันอัปเดตข้อมูล
@@ -85,18 +100,38 @@ console.log("🚀 Copilot Pin Extension Starting...");
     }
 
     console.log(`💾 Saving data: ${percent.toFixed(1)}%`);
-    await saveDataToStorage(percent);
+    const success = await saveDataToStorage(percent);
+
+    // ถ้า extension context invalidated ให้หยุดการทำงาน
+    if (!success) {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+        console.log(
+          "🛑 Stopped update interval due to extension context invalidation"
+        );
+      }
+      return null;
+    }
+
     return percent;
   }
 
   // อัปเดตข้อมูลทันที
   const initialPercent = await updateData();
 
-  // อัปเดตข้อมูลทุก 10 วินาที
-  const updateInterval = setInterval(async () => {
-    await updateData();
-    console.log("📈 Data updated automatically");
-  }, 10000);
+  // อัปเดตข้อมูลทุก 10 วินาที (ถ้า initialPercent ไม่เป็น null)
+  let updateInterval = null;
+  if (initialPercent !== null) {
+    updateInterval = setInterval(async () => {
+      const result = await updateData();
+      if (result === null) {
+        // หยุดการทำงานถ้า extension context invalidated
+        clearInterval(updateInterval);
+        return;
+      }
+      console.log("📈 Data updated automatically");
+    }, 10000);
+  }
 
   // แสดง notification ให้ user รู้ว่า extension ทำงาน
   const notification = document.createElement("div");
@@ -124,22 +159,46 @@ console.log("🚀 Copilot Pin Extension Starting...");
     notification.remove();
   }, 4000);
 
-  // รับฟัง message จาก pin window
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "forceUpdate") {
-      console.log("🔄 Force update requested");
-      updateData().then((percent) => {
-        sendResponse({ success: true, percent: percent });
-      });
-      return true; // เพื่อให้ response แบบ async
-    }
-  });
+  // รับฟัง message จาก pin window (ตรวจสอบ extension context)
+  if (chrome && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === "forceUpdate") {
+        console.log("🔄 Force update requested");
+        updateData()
+          .then((percent) => {
+            if (percent !== null) {
+              sendResponse({ success: true, percent: percent });
+            } else {
+              sendResponse({
+                success: false,
+                error: "Extension context invalidated",
+              });
+            }
+          })
+          .catch((error) => {
+            console.error("Error during force update:", error);
+            sendResponse({ success: false, error: error.message });
+          });
+        return true; // เพื่อให้ response แบบ async
+      }
+    });
+  } else {
+    console.warn(
+      "⚠️ Chrome runtime API not available, message listener not set"
+    );
+  }
 
   console.log(`✅ Content script initialized for tab: ${tabId}`);
-  console.log(`📊 Initial usage: ${initialPercent?.toFixed(1)}%`);
+  if (initialPercent !== null) {
+    console.log(`📊 Initial usage: ${initialPercent?.toFixed(1)}%`);
+  } else {
+    console.log("⚠️ Extension context invalidated during initialization");
+  }
 
   // Cleanup เมื่อหน้าถูกปิด
   window.addEventListener("beforeunload", () => {
-    clearInterval(updateInterval);
+    if (updateInterval) {
+      clearInterval(updateInterval);
+    }
   });
 })();

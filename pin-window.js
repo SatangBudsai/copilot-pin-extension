@@ -7,9 +7,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const progressBar = document.getElementById("progressBar");
   const status = document.getElementById("status");
   const refreshBtn = document.getElementById("refreshBtn");
-  const closeBtn = document.getElementById("closeBtn");
+  // ลบการอ้างอิง closeBtn
 
-  // ฟังก์ชันจัดการ window resize
+  // ฟังก์ชันจัดการ window resize สำหรับขนาดเล็กมากๆ
   function handleWindowResize() {
     // ตรวจสอบขนาดหน้าต่างปัจจุบัน
     const width = window.innerWidth;
@@ -17,13 +17,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     console.log(`📏 Window resized to: ${width}x${height}`);
 
-    // ปรับ font size ตามขนาด
-    if (width < 250) {
-      document.body.style.fontSize = "0.85em";
-    } else if (width < 300) {
-      document.body.style.fontSize = "0.9em";
+    // ปรับ font size ตามขนาดเล็กมากๆ
+    if (width < 180) {
+      document.body.style.fontSize = "0.7em";
+    } else if (width < 200) {
+      document.body.style.fontSize = "0.8em";
     } else {
-      document.body.style.fontSize = "1em";
+      document.body.style.fontSize = "0.9em";
     }
 
     // Force repaint เพื่อให้ CSS ทำงานใหม่
@@ -67,6 +67,15 @@ document.addEventListener("DOMContentLoaded", function () {
   async function fetchData() {
     try {
       console.log("🔍 Fetching data from storage...");
+
+      // ตรวจสอบว่า chrome API ยังใช้ได้หรือไม่
+      if (!chrome || !chrome.storage || !chrome.storage.local) {
+        console.warn("⚠️ Chrome extension context invalidated");
+        status.textContent = "Extension context lost";
+        status.className = "status error";
+        return false;
+      }
+
       const result = await chrome.storage.local.get(["copilotData"]);
 
       if (result.copilotData) {
@@ -94,6 +103,11 @@ document.addEventListener("DOMContentLoaded", function () {
     refreshBtn.disabled = true;
 
     try {
+      // ตรวจสอบ chrome API ก่อน
+      if (!chrome || !chrome.tabs) {
+        throw new Error("Chrome extension context invalidated");
+      }
+
       // หา GitHub tabs ทั้งหมด
       const tabs = await chrome.tabs.query({ url: "https://github.com/*" });
       console.log("🔍 Found GitHub tabs:", tabs.length);
@@ -119,9 +133,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  closeBtn.addEventListener("click", () => {
-    window.close();
-  });
+  // ลบ event listener สำหรับ closeBtn
 
   // ทำให้ window ลากได้ (แบบง่าย)
   let isDragging = false;
@@ -181,9 +193,9 @@ document.addEventListener("DOMContentLoaded", function () {
       const deltaX = e.clientX - startX;
       const deltaY = e.clientY - startY;
 
-      // คำนวณขนาดใหม่ (ขั้นต่ำ 250x120)
-      const newWidth = Math.max(250, initialWidth + deltaX);
-      const newHeight = Math.max(120, initialHeight + deltaY);
+      // คำนวณขนาดใหม่ (ขั้นต่ำ 160x60 สำหรับขนาดเล็กมากๆ)
+      const newWidth = Math.max(160, initialWidth + deltaX);
+      const newHeight = Math.max(60, initialHeight + deltaY);
 
       // อัปเดตขนาด window
       chrome.windows.getCurrent((currentWindow) => {
@@ -204,8 +216,27 @@ document.addEventListener("DOMContentLoaded", function () {
   // เริ่มต้น
   fetchData();
 
-  // อัปเดตข้อมูลทุก 2 วินาที
-  updateInterval = setInterval(fetchData, 2000);
+  // อัปเดตข้อมูลทุก 2 วินาที (ตรวจสอบ extension context)
+  updateInterval = setInterval(async () => {
+    try {
+      const success = await fetchData();
+      if (!success) {
+        // หยุดการทำงานถ้า extension context invalidated
+        clearInterval(updateInterval);
+        console.log(
+          "🛑 Stopped update interval due to extension context invalidation"
+        );
+      }
+    } catch (error) {
+      console.error("Error in update interval:", error);
+      if (error.message.includes("Extension context invalidated")) {
+        clearInterval(updateInterval);
+        console.log(
+          "🛑 Stopped update interval due to extension context invalidation"
+        );
+      }
+    }
+  }, 2000);
 
   // ทำความสะอาดเมื่อปิด window
   window.addEventListener("beforeunload", () => {
