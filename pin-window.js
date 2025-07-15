@@ -1,5 +1,6 @@
 let currentData = { percent: 0, title: "GitHub", timestamp: Date.now() };
 let updateInterval = null;
+let windowResizeObserver = null;
 
 document.addEventListener("DOMContentLoaded", function () {
   const usageText = document.getElementById("usageText");
@@ -7,6 +8,41 @@ document.addEventListener("DOMContentLoaded", function () {
   const status = document.getElementById("status");
   const refreshBtn = document.getElementById("refreshBtn");
   const closeBtn = document.getElementById("closeBtn");
+
+  // ฟังก์ชันจัดการ window resize
+  function handleWindowResize() {
+    // ตรวจสอบขนาดหน้าต่างปัจจุบัน
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    console.log(`📏 Window resized to: ${width}x${height}`);
+
+    // ปรับ font size ตามขนาด
+    if (width < 250) {
+      document.body.style.fontSize = "0.85em";
+    } else if (width < 300) {
+      document.body.style.fontSize = "0.9em";
+    } else {
+      document.body.style.fontSize = "1em";
+    }
+
+    // Force repaint เพื่อให้ CSS ทำงานใหม่
+    document.body.style.display = "none";
+    document.body.offsetHeight; // trigger reflow
+    document.body.style.display = "flex";
+  }
+
+  // ตั้งค่า ResizeObserver สำหรับตรวจจับการเปลี่ยนขนาด
+  if (window.ResizeObserver) {
+    windowResizeObserver = new ResizeObserver((entries) => {
+      handleWindowResize();
+    });
+
+    windowResizeObserver.observe(document.body);
+  } else {
+    // Fallback สำหรับบราวเซอร์เก่า
+    window.addEventListener("resize", handleWindowResize);
+  }
 
   // ฟังก์ชันอัปเดตการแสดงผล
   function updateDisplay(data) {
@@ -89,11 +125,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ทำให้ window ลากได้ (แบบง่าย)
   let isDragging = false;
-  let startX, startY, initialLeft, initialTop;
+  let isResizing = false;
+  let startX, startY, initialLeft, initialTop, initialWidth, initialHeight;
 
+  const resizeHandle = document.getElementById("resizeHandle");
+
+  // จัดการการลากเพื่อย้าย window
   document.addEventListener("mousedown", (e) => {
-    // ไม่ให้ลากถ้ากดที่ปุ่ม
-    if (e.target.tagName === "BUTTON") return;
+    // ไม่ให้ลากถ้ากดที่ปุ่มหรือ resize handle
+    if (e.target.tagName === "BUTTON" || e.target.id === "resizeHandle") return;
 
     isDragging = true;
     startX = e.clientX;
@@ -109,23 +149,55 @@ document.addEventListener("DOMContentLoaded", function () {
     e.preventDefault();
   });
 
-  document.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
+  // จัดการการลากเพื่อปรับขนาด window
+  resizeHandle.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startY = e.clientY;
 
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
-
-    // อัปเดตตำแหน่ง window
+    // เก็บขนาดเริ่มต้นของ window
     chrome.windows.getCurrent((currentWindow) => {
-      chrome.windows.update(currentWindow.id, {
-        left: initialLeft + deltaX,
-        top: initialTop + deltaY,
-      });
+      initialWidth = currentWindow.width;
+      initialHeight = currentWindow.height;
     });
+
+    e.stopPropagation();
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (isDragging && !isResizing) {
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      // อัปเดตตำแหน่ง window
+      chrome.windows.getCurrent((currentWindow) => {
+        chrome.windows.update(currentWindow.id, {
+          left: initialLeft + deltaX,
+          top: initialTop + deltaY,
+        });
+      });
+    } else if (isResizing) {
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      // คำนวณขนาดใหม่ (ขั้นต่ำ 250x120)
+      const newWidth = Math.max(250, initialWidth + deltaX);
+      const newHeight = Math.max(120, initialHeight + deltaY);
+
+      // อัปเดตขนาด window
+      chrome.windows.getCurrent((currentWindow) => {
+        chrome.windows.update(currentWindow.id, {
+          width: newWidth,
+          height: newHeight,
+        });
+      });
+    }
   });
 
   document.addEventListener("mouseup", () => {
     isDragging = false;
+    isResizing = false;
     document.body.style.cursor = "default";
   });
 
@@ -140,7 +212,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (updateInterval) {
       clearInterval(updateInterval);
     }
+
+    if (windowResizeObserver) {
+      windowResizeObserver.disconnect();
+    }
   });
+
+  // เรียกใช้การปรับขนาดครั้งแรก
+  handleWindowResize();
 
   console.log("🚀 Pin window initialized");
 });

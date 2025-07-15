@@ -1,8 +1,31 @@
 let pinnedWindow = null;
+let keepOnTopInterval = null;
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Copilot Premium Pin Extension Installed");
 });
+
+// ฟังก์ชันเพื่อทำให้ window อยู่บนสุด (best effort)
+async function keepWindowOnTop() {
+  if (pinnedWindow) {
+    try {
+      // ดึงข้อมูล window ปัจจุบัน
+      const window = await chrome.windows.get(pinnedWindow.id);
+
+      // ถ้า window ยังเปิดอยู่ ให้ focus มันอีกครั้ง
+      if (window && !window.focused) {
+        await chrome.windows.update(pinnedWindow.id, { focused: true });
+      }
+    } catch (error) {
+      // Window ถูกปิดแล้ว ให้หยุด interval
+      if (keepOnTopInterval) {
+        clearInterval(keepOnTopInterval);
+        keepOnTopInterval = null;
+      }
+      pinnedWindow = null;
+    }
+  }
+}
 
 // เมื่อกด extension icon ให้เปิด pin window เลย
 chrome.action.onClicked.addListener(async (tab) => {
@@ -62,6 +85,12 @@ async function createPinnedWindow() {
     }
   }
 
+  // หยุด interval เก่า
+  if (keepOnTopInterval) {
+    clearInterval(keepOnTopInterval);
+    keepOnTopInterval = null;
+  }
+
   // สร้าง window ใหม่
   try {
     // ดึงขนาดหน้าจอปัจจุบัน
@@ -80,6 +109,9 @@ async function createPinnedWindow() {
     });
 
     console.log("Pin window created:", pinnedWindow.id);
+
+    // เริ่ม interval เพื่อทำให้ window อยู่บนสุด
+    keepOnTopInterval = setInterval(keepWindowOnTop, 3000); // ทุก 3 วินาที
   } catch (error) {
     console.error("Error creating pin window:", error);
 
@@ -96,8 +128,25 @@ async function createPinnedWindow() {
       });
 
       console.log("Pin window created with default position:", pinnedWindow.id);
+
+      // เริ่ม interval เพื่อทำให้ window อยู่บนสุด
+      keepOnTopInterval = setInterval(keepWindowOnTop, 3000); // ทุก 3 วินาที
     } catch (fallbackError) {
       console.error("Failed to create pin window:", fallbackError);
     }
   }
 }
+
+// ฟังเมื่อ window ถูกปิด
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (pinnedWindow && pinnedWindow.id === windowId) {
+    console.log("Pin window closed");
+    pinnedWindow = null;
+
+    // หยุด interval
+    if (keepOnTopInterval) {
+      clearInterval(keepOnTopInterval);
+      keepOnTopInterval = null;
+    }
+  }
+});

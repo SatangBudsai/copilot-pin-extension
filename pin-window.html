@@ -11,8 +11,10 @@
       }
 
       body {
-        width: 320px;
-        height: 140px;
+        min-width: 280px;
+        min-height: 120px;
+        width: 100vw;
+        height: 100vh;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           sans-serif;
         background: #ffffff;
@@ -20,6 +22,8 @@
         border-radius: 6px;
         overflow: hidden;
         user-select: none;
+        display: flex;
+        flex-direction: column;
       }
 
       .header {
@@ -32,6 +36,34 @@
         font-size: 12px;
         font-weight: 600;
         color: #24292f;
+        flex-shrink: 0;
+      }
+
+      .content {
+        padding: 16px 12px 12px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 0;
+      }
+
+      .usage-text {
+        font-size: clamp(16px, 4vw, 24px);
+        font-weight: 700;
+        color: #24292f;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+
+      .progress-container {
+        width: 100%;
+        height: clamp(6px, 1vh, 10px);
+        background: #e1e4e8;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 8px;
+        flex-shrink: 0;
       }
 
       .title {
@@ -88,26 +120,6 @@
         color: white;
       }
 
-      .content {
-        padding: 16px 12px 12px;
-      }
-
-      .usage-text {
-        font-size: 20px;
-        font-weight: 700;
-        color: #24292f;
-        margin-bottom: 8px;
-      }
-
-      .progress-container {
-        width: 100%;
-        height: 8px;
-        background: #e1e4e8;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-bottom: 8px;
-      }
-
       .progress-bar {
         height: 100%;
         background: #22c55e;
@@ -117,9 +129,10 @@
       }
 
       .status {
-        font-size: 11px;
+        font-size: clamp(9px, 2.5vw, 12px);
         color: #656d76;
         text-align: center;
+        margin-top: auto;
       }
 
       .connecting {
@@ -128,6 +141,64 @@
 
       .error {
         color: #d73a49;
+      }
+
+      /* Resize handle */
+      .resize-handle {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 15px;
+        height: 15px;
+        background: linear-gradient(
+          -45deg,
+          transparent 0%,
+          transparent 40%,
+          #ccc 40%,
+          #ccc 60%,
+          transparent 60%
+        );
+        cursor: nw-resize;
+        z-index: 1000;
+      }
+
+      .resize-handle:hover {
+        background: linear-gradient(
+          -45deg,
+          transparent 0%,
+          transparent 40%,
+          #999 40%,
+          #999 60%,
+          transparent 60%
+        );
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 300px) {
+        .header {
+          padding: 6px 8px;
+          font-size: 11px;
+        }
+
+        .content {
+          padding: 12px 8px 8px;
+        }
+
+        button {
+          width: 20px;
+          height: 20px;
+          font-size: 10px;
+        }
+      }
+
+      @media (max-height: 150px) {
+        .usage-text {
+          margin-bottom: 4px;
+        }
+
+        .progress-container {
+          margin-bottom: 4px;
+        }
       }
     </style>
   </head>
@@ -150,6 +221,9 @@
       </div>
       <div class="status connecting" id="status">Connecting...</div>
     </div>
+
+    <!-- Resize handle -->
+    <div class="resize-handle" id="resizeHandle"></div>
 
     <script src="pin-window.js"></script>
   </body>
